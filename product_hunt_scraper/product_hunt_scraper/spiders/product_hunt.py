@@ -6,10 +6,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from typing import Generator
 from selenium.common.exceptions import TimeoutException
 
-
 class ProductHuntSpider(scrapy.Spider):
     name = 'product_hunt'
-    start_urls = ['http://www.producthunt.com/time-travel/2023/9']
     
     custom_settings = {
         'DOWNLOAD_DELAY': 3,
@@ -18,10 +16,21 @@ class ProductHuntSpider(scrapy.Spider):
 
     def start_requests(self) -> Generator[scrapy.Request, None, None]:
         """Initialize the web driver and start requests by iterating over start URLs."""
+        # Define the start and end dates for scraping
+        start_year, start_month = 2023, 6
+        end_year, end_month = 2023, 9
+
+        # Generate start URLs dynamically
+        start_urls = [
+            f"http://www.producthunt.com/time-travel/{year}/{month:02d}"
+            for year in range(start_year, end_year + 1)
+            for month in range(start_month if year == start_year else 1, end_month + 1 if year == end_year else 13)
+        ]
+
         driver = webdriver.Chrome()
 
         try:
-            for url in self.start_urls:
+            for url in start_urls:
                 driver.get(url)
                 last_height = driver.execute_script("return document.body.scrollHeight")
 
@@ -44,7 +53,6 @@ class ProductHuntSpider(scrapy.Spider):
             self.logger.error(e)
         finally:
             driver.quit()
-
 
     def parse(self, response: scrapy.http.Response) -> Generator[dict, None, None]:
         """Parse the response to extract the desired data."""
