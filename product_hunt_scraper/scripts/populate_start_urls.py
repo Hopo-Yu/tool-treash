@@ -3,7 +3,7 @@ import json
 
 
 # Initialize Redis client
-client = redis.Redis(host='localhost', port=6379, db=0)
+client = redis.Redis(host='localhost', port=6379, db=0, password='Y12h12p12')
 
 # Define the start and end dates for scraping
 start_year, start_month = 2023, 6

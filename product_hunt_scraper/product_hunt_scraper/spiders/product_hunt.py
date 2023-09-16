@@ -15,8 +15,8 @@ class ProductHuntSpider(RedisSpider):
     redis_key = 'product_hunt:start_urls'
 
     custom_settings = {
-        'DOWNLOAD_DELAY': 3,
-        'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
+        'DOWNLOAD_DELAY': 5,
+        'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36 Edg/116.0.1938.81'
     }
 
     def parse(self, response: scrapy.http.Response) -> Generator[dict, None, None]:
@@ -24,6 +24,8 @@ class ProductHuntSpider(RedisSpider):
 
         # Configure the Chrome WebDriver
         options = ChromeOptions()
+        options.add_argument('--ignore-certificate-errors')
+
         # Uncomment the next line if you want to run Chrome in headless mode
         # options.add_argument('--headless')
         driver = webdriver.Chrome(options=options)
@@ -37,7 +39,7 @@ class ProductHuntSpider(RedisSpider):
                 driver.execute_script(
                     "window.scrollTo(0, document.body.scrollHeight);")
                 try:
-                    WebDriverWait(driver, 10).until(lambda d: d.execute_script(
+                    WebDriverWait(driver, 15).until(lambda d: d.execute_script(
                         "return document.body.scrollHeight") > last_height)
                 except TimeoutException:
                     break
