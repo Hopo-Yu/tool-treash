@@ -1,66 +1,72 @@
 import scrapy
+from scrapy_redis.spiders import RedisSpider
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from typing import Generator
 from selenium.common.exceptions import TimeoutException
+from typing import Generator
 
-class ProductHuntSpider(scrapy.Spider):
+
+class ProductHuntSpider(RedisSpider):
     name = 'product_hunt'
-    
+    redis_key = 'product_hunt:start_urls'
+
     custom_settings = {
         'DOWNLOAD_DELAY': 3,
         'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
     }
 
-    def start_requests(self) -> Generator[scrapy.Request, None, None]:
+    def parse(self, response: scrapy.http.Response) -> Generator[dict, None, None]:
         """Initialize the web driver and start requests by iterating over start URLs."""
-        # Define the start and end dates for scraping
-        start_year, start_month = 2023, 6
-        end_year, end_month = 2023, 9
 
-        # Generate start URLs dynamically
-        start_urls = [
-            f"http://www.producthunt.com/time-travel/{year}/{month:02d}"
-            for year in range(start_year, end_year + 1)
-            for month in range(start_month if year == start_year else 1, end_month + 1 if year == end_year else 13)
-        ]
-
-        driver = webdriver.Chrome()
+        # Configure the Chrome WebDriver
+        options = ChromeOptions()
+        # Uncomment the next line if you want to run Chrome in headless mode
+        # options.add_argument('--headless')
+        driver = webdriver.Chrome(options=options)
 
         try:
-            for url in start_urls:
-                driver.get(url)
-                last_height = driver.execute_script("return document.body.scrollHeight")
+            driver.get(response.url)
+            last_height = driver.execute_script(
+                "return document.body.scrollHeight")
 
-                while True:
-                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    try:
-                        WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.body.scrollHeight") > last_height)
-                    except TimeoutException:
-                        break
-                    
-                    new_height = driver.execute_script("return document.body.scrollHeight")
-                    if new_height == last_height:
-                        break
-                    last_height = new_height
+            while True:
+                driver.execute_script(
+                    "window.scrollTo(0, document.body.scrollHeight);")
+                try:
+                    WebDriverWait(driver, 10).until(lambda d: d.execute_script(
+                        "return document.body.scrollHeight") > last_height)
+                except TimeoutException:
+                    break
 
-                page_source = driver.page_source
-                response = scrapy.http.HtmlResponse(url=url, body=page_source, encoding='utf-8')
-                yield scrapy.Request(url, callback=self.parse, dont_filter=True, meta={'response': response})
+                new_height = driver.execute_script(
+                    "return document.body.scrollHeight")
+                if new_height == last_height:
+                    break
+                last_height = new_height
+
+            page_source = driver.page_source
+            response = scrapy.http.HtmlResponse(
+                url=response.url, body=page_source, encoding='utf-8')
+
+            self.logger.info(f"Processing: {response.url}")
+            self.logger.info(f"Response status: {response.status}")
+            self.logger.info(
+                f"Number of links found: {len(response.css('a.styles_title__HzPeb'))}")
+
+            for a_tag in response.css('a.styles_title__HzPeb'):
+                text = a_tag.css('::text').get().strip()
+                href = a_tag.css('::attr(href)').get().strip()
+                self.logger.info(f"Extracted text: {text}")
+                self.logger.info(f"Extracted href: {href}")
+                yield {
+                    'text': text,
+                    'href': href
+                }
         except Exception as e:
             self.logger.error(e)
         finally:
             driver.quit()
-
-    def parse(self, response: scrapy.http.Response) -> Generator[dict, None, None]:
-        """Parse the response to extract the desired data."""
-        response = response.meta['response']
-        for a_tag in response.css('a.styles_title__HzPeb'):
-            text = a_tag.css('::text').get().strip()
-            href = a_tag.css('::attr(href)').get().strip()
-            yield {
-                'text': text,
-                'href': href
-            }
